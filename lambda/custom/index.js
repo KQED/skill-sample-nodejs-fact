@@ -3,12 +3,15 @@
 
 const Alexa = require('ask-sdk-core');
 const cookbook = require('./alexa-cookbook.js');
+const https = require('https');
+const fetch = require("node-fetch");
+const htmlToText = require('html-to-text');
 
 //=========================================================================================================================================
 //TODO: The items below this comment need your attention.
 //=========================================================================================================================================
 
-const SKILL_NAME = 'Space Facts';
+const SKILL_NAME = 'election props';
 const GET_FACT_MESSAGE = 'Here\'s your fact: ';
 const HELP_MESSAGE = 'You can say tell me a space fact, or, you can say exit... What can I help you with?';
 const HELP_REPROMPT = 'What can I help you with?';
@@ -20,41 +23,49 @@ const STOP_MESSAGE = 'Goodbye!';
 //TODO: Replace this data with your own.  You can find translations of this data at http://github.com/alexa/skill-sample-node-js-fact/lambda/data
 //=========================================================================================================================================
 
-const data = [
-  'A year on Mercury is just 88 days long.',
-  'Despite being farther from the Sun, Venus experiences higher temperatures than Mercury.',
-  'Venus rotates counter-clockwise, possibly because of a collision in the past with an asteroid.',
-  'On Mars, the Sun appears about half the size as it does on Earth.',
-  'Earth is the only planet not named after a god.',
-  'Jupiter has the shortest day of all the planets.',
-  'The Milky Way galaxy will collide with the Andromeda Galaxy in about 5 billion years.',
-  'The Sun contains 99.86% of the mass in the Solar System.',
-  'The Sun is an almost perfect sphere.',
-  'A total solar eclipse can happen once every 1 to 2 years. This makes them a rare event.',
-  'Saturn radiates two and a half times more energy into space than it receives from the sun.',
-  'The temperature inside the Sun can reach 15 million degrees Celsius.',
-  'The Moon is moving approximately 3.8 cm away from our planet every year.',
-];
 
 //=========================================================================================================================================
 //Editing anything below this line might break your skill.
 //=========================================================================================================================================
 
-const GetNewFactHandler = {
+const LaunchRequestHandler = {
+    canHandle(handlerInput) {
+        const { request } = handlerInput.requestEnvelope;
+        return request.type === `LaunchRequest`;
+    },
+    handle(handlerInput) {
+        return handlerInput.responseBuilder
+            .speak(`Welcome To election props, Which props will you like to listen`)
+            .reprompt(`Which props will you like to listen?`)
+            .getResponse();
+    },
+};
+
+
+const GetPropsIntent = {
   canHandle(handlerInput) {
     const request = handlerInput.requestEnvelope.request;
     return request.type === 'LaunchRequest'
       || (request.type === 'IntentRequest'
-        && request.intent.name === 'GetNewFactIntent');
+        && request.intent.name === 'GetPropsIntent');
   },
-  handle(handlerInput) {
-    const randomFact = cookbook.getRandomItem(data);
-    const speechOutput = GET_FACT_MESSAGE + randomFact;
+    handle(handlerInput) {
+        async function buildAlexaResponse(){
+            const { intent } = handlerInput.requestEnvelope.request;
+           console.log(intent)
+            const url = `https://demo-api.kqed.org/propositions`;
+            let response = await fetch(url);
+            const json = await response.json();
+            const title = json[intent.slots.Answer.value-1].title
+            const content = htmlToText.fromString(json[intent.slots.Answer.value-1].content)
+            return handlerInput.responseBuilder
+                .speak(title)
+                .speak(content)
+                .getResponse();
+        }
 
-    return handlerInput.responseBuilder
-      .speak(speechOutput)
-      .withSimpleCard(SKILL_NAME, randomFact)
-      .getResponse();
+
+    return buildAlexaResponse()
   },
 };
 
@@ -133,7 +144,8 @@ const skillBuilder = Alexa.SkillBuilders.custom();
 
 exports.handler = skillBuilder
   .addRequestHandlers(
-    GetNewFactHandler,
+      LaunchRequestHandler,
+      GetPropsIntent,
     HelpHandler,
     ExitHandler,
     FallbackHandler,
